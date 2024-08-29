@@ -1,11 +1,20 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:rfid_c72_plugin/rfid_c72_plugin.dart';
 import 'package:rfid_c72_plugin/tag_epc.dart';
 import 'package:get/get.dart';
 import 'package:rfid_c72_plugin_example/models/prodEtiquetasRFID.dart'; // Make sure to update this with the correct absolute path
 import 'package:rfid_c72_plugin_example/services/api_service.dart'; // Make sure to update this with the correct absolute path
+import 'package:audioplayers/audioplayers.dart';
+import 'dart:isolate';
+import 'package:flutter_volume_controller/flutter_volume_controller.dart';
+import 'package:open_file/open_file.dart';
 
 class RfidScanner extends StatefulWidget {
   const RfidScanner({Key? key}) : super(key: key);
@@ -22,9 +31,14 @@ class _RfidScannerState extends State<RfidScanner> {
   bool _isLoading = true;
   int _totalEPC = 0;
 
+  final Set<String> _uniqueEPCs = <String>{};
+  final AudioPlayer _audioPlayer = AudioPlayer(); // Instantiate the AudioPlayer
   final TextEditingController _powerLevelController = TextEditingController();
   final List<TagEpc> _data = [];
   final List<String> _EPC = [];
+  Duration _debounceDuration =
+      const Duration(milliseconds: 500); // Adjust debounce duration as needed
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -65,6 +79,15 @@ class _RfidScannerState extends State<RfidScanner> {
     RfidC72Plugin.tagsStatusStream.receiveBroadcastStream().listen(_updateTags);
   }
 
+  Future<void> _startSingleReading() async {
+    try {
+      await RfidC72Plugin.startSingle;
+      _playBeepSoundAtMaxVolume(); // Play the beep sound after a successful read
+    } catch (e) {
+      _showError('Error during single read: $e');
+    }
+  }
+
   void _handleKeyEvent(RawKeyEvent event) {
     print('Pressed key code: ${event.logicalKey.keyId}');
     if (event is RawKeyDownEvent) {
@@ -81,15 +104,126 @@ class _RfidScannerState extends State<RfidScanner> {
     }
   }
 
-  void _updateTags(dynamic result) {
-    setState(() {
-      _data.addAll(TagEpc.parseTags(result));
-      _totalEPC = _data.toSet().length;
+  Future<void> _openFile(String filePath) async {
+    final result = await OpenFile.open(filePath);
+    if (result.type != ResultType.done) {
+      Get.snackbar(
+        "Error",
+        "Failed to open the file",
+        backgroundColor: Colors.redAccent,
+        duration: const Duration(seconds: 3),
+        colorText: Colors.white,
+      );
+    }
+  }
 
-      // Fetch the label info for each tag and show it in a modal
-      for (var tag in _data) {
-        _fetchLabelAndShowModal(tag.epc);
+  Future<void> _sendUniqueEPCsToAPI() async {
+    final apiService = ApiService(); // Instantiate your ApiService
+    final epcList = _uniqueEPCs.toList(); // Convert set to list
+
+    try {
+      final fileBytes = await apiService.sendEPCsAndGenerateExcel(epcList);
+      final String timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .replaceAll('.', '-');
+      final String fileName =
+          'rfid_data_$timestamp.xlsx'; // Create a file name with the timestamp
+      await downloadExcelFile(fileBytes);
+      Get.snackbar('Success', 'File downloaded successfully',
+          backgroundColor: Colors.green, colorText: Colors.white);
+    } catch (e) {
+      _showError('Error sending data to API: $e');
+    }
+  }
+
+  // Function to download the file
+  // Function to download the file
+  Future<void> downloadExcelFile(Uint8List bytes) async {
+    // bool permissionGranted = await requestStoragePermission();
+    // if (!permissionGranted) {
+    //   // Handle the case when permission is not granted
+    //   print('Storage permission denied');
+    //   Get.snackbar("Permission Denied",
+    //       "Storage permission is required to save the file.");
+    //   return;
+    // }
+    final String timestamp = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .replaceAll('.', '-');
+
+    final directory = await getExternalStorageDirectory();
+    final filePath = '${directory!.path}/rfid_data_$timestamp.xlsx';
+
+    final file = File(filePath);
+    await file.writeAsBytes(bytes);
+
+    print('Excel file saved to $filePath');
+
+    // Show snackbar with a button to open the file
+    Get.snackbar(
+      "File Saved",
+      "The Excel file has been saved to $filePath",
+      backgroundColor: Color.fromARGB(255, 150, 206, 153),
+      mainButton: TextButton(
+        onPressed: () {
+          _openFile(filePath); // Call the function to open the file
+        },
+        child: const Text(
+          "Open",
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _playBeepSoundAtMaxVolume() async {
+    print('Attempting to play beep sound at max volume');
+
+    try {
+      // Get the current volume level
+      // double? currentVolume = await FlutterVolumeController.getVolume();
+
+      // Set the volume to the maximum level (1.0 represents 100% volume)
+      // await FlutterVolumeController.setVolume(1.0);
+
+      // Play the beep sound
+      await _audioPlayer.play(AssetSource('beep.mp3'));
+
+      // Optionally, restore the previous volume level after a delay
+      // await Future.delayed(Duration(seconds: 1));
+      // await FlutterVolumeController.setVolume(currentVolume!);
+
+      print('Beep sound played successfully at max volume');
+    } catch (e) {
+      print('Error playing beep sound at max volume: $e');
+    }
+  }
+
+  // Separate function to parse tags
+  void _parseTagsInBackground(SendPort sendPort, dynamic result) {
+    List<TagEpc> newTags = TagEpc.parseTags(result);
+    sendPort.send(newTags);
+  }
+
+  void _updateTags(dynamic result) {
+    // Start or reset debounce timer
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(_debounceDuration, () {
+      List<TagEpc> newTags = TagEpc.parseTags(result);
+
+      for (var tag in newTags) {
+        if (_uniqueEPCs.add(tag.epc)) {
+          // Only adds if not already present
+          _data.add(tag);
+          _playBeepSoundAtMaxVolume();
+        }
       }
+
+      setState(() {
+        _totalEPC = _uniqueEPCs.length;
+      });
     });
   }
 
@@ -98,7 +232,7 @@ class _RfidScannerState extends State<RfidScanner> {
       ProdEtiquetasRFID label = await ApiService().getLabelByRFID(epc);
       _showLabelModal(label);
     } catch (e) {
-      _showError("Error fetching label: $e");
+      _showError("Error al verificar: $e");
     }
   }
 
@@ -159,6 +293,7 @@ class _RfidScannerState extends State<RfidScanner> {
     setState(() {
       _data.clear();
       _totalEPC = 0;
+      _uniqueEPCs.clear();
     });
   }
 
@@ -194,6 +329,8 @@ class _RfidScannerState extends State<RfidScanner> {
       "Error",
       message,
       backgroundColor: Colors.redAccent,
+      duration: const Duration(milliseconds: 900),
+      colorText: Colors.white,
     );
   }
 
@@ -214,6 +351,7 @@ class _RfidScannerState extends State<RfidScanner> {
                   _buildControlButtons(),
                   _buildClearButton(),
                   _build2DBarcodeButton(),
+                  _buildDownloadExcelButton(),
                   _buildTotalEPCDisplay(),
                   _buildTagList(),
                 ],
@@ -310,9 +448,8 @@ class _RfidScannerState extends State<RfidScanner> {
               'Start Single Reading',
               style: TextStyle(color: Colors.white),
             ),
-            onPressed: () async {
-              await RfidC72Plugin.startSingle;
-            },
+            onPressed:
+                _startSingleReading, // Trigger single reading and play beep
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -388,23 +525,40 @@ class _RfidScannerState extends State<RfidScanner> {
     );
   }
 
+  Widget _buildDownloadExcelButton() {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.orange,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(29.0),
+        ),
+      ),
+      child: const Text(
+        'Generate & Download Excel',
+        style: TextStyle(color: Colors.white),
+      ),
+      onPressed: _sendUniqueEPCsToAPI,
+    );
+  }
+
   Widget _buildTagList() {
-    return Column(
-      children: _data.map((TagEpc tag) {
-        _EPC.add(tag.epc.replaceAll(RegExp('EPC:'), ''));
-        return Card(
-          color: Colors.blue.shade50,
-          child: Container(
-            width: 330,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              'Tag: ${tag.epc.replaceAll(RegExp('EPC:'), '')}',
-              style: TextStyle(color: Colors.blue.shade800),
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _data.length,
+      itemBuilder: (context, index) {
+        TagEpc tag = _data[index];
+        return GestureDetector(
+          onTap: () => _fetchLabelAndShowModal(tag.epc), // Trigger modal on tap
+          child: Card(
+            child: ListTile(
+              title: Text('EPC: ${tag.epc}'),
+              subtitle: Text('Count: ${tag.count}, RSSI: ${tag.rssi}'),
+              trailing: const Icon(Icons.info_outline),
             ),
           ),
         );
-      }).toList(),
+      },
     );
   }
 }

@@ -1,10 +1,14 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:rfid_c72_plugin_example/models/prodEtiquetasRFID.dart';
+import 'dart:typed_data';
 
 class ApiService {
   static const String baseUrl = 'http://172.16.10.31/api';
+  // local server
+  // static const String baseUrl = 'http://172.16.20.52:5001/api';
 
+  // Method to get label by RFID
   Future<ProdEtiquetasRFID> getLabelByRFID(String code) async {
     final response = await http
         .get(Uri.parse('$baseUrl/RfidLabel/GetLabelByTraceabilityCode/$code'));
@@ -12,7 +16,49 @@ class ApiService {
     if (response.statusCode == 200) {
       return ProdEtiquetasRFID.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to load label');
+      // Return the response
+      throw (response.body);
     }
   }
+
+  // Method to send EPCs and generate/download Excel file
+  Future<Uint8List> sendEPCsAndGenerateExcel(List<String> epcs) async {
+    final apiUrl =
+        '$baseUrl/RfidLabel/generate-excel-from-handheld'; // Replace with your API endpoint
+
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(epcs), // Ensure the list is correctly serialized
+    );
+
+    print(apiUrl);
+    print("response.statusCode: ${response.statusCode}");
+
+    if (response.statusCode == 200) {
+      return response.bodyBytes; // Return the file bytes
+    } else {
+      throw Exception('Failed to generate Excel file: ${response.body}');
+    }
+  }
+
+  // Future<void> sendEPCsAndGenerateExcel2(List<String> epcs) async {
+  //   final url = Uri.parse('$baseUrl/RfidLabel/generate-excel');
+
+  //   final response = await http.post(
+  //     url,
+  //     headers: {
+  //       'Content-Type': 'application/json',
+  //     },
+  //     body: jsonEncode(epcs), // Ensure the list is correctly serialized
+  //   );
+
+  //   if (response.statusCode == 200) {
+  //     // Handle successful response, such as saving the file or showing a message
+  //     // In this case, you may want to download the file or open it
+  //   } else {
+  //     // Handle error response
+  //     throw Exception('Failed to generate Excel file: ${response.body}');
+  //   }
+  // }
 }
