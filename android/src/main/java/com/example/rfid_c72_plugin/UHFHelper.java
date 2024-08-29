@@ -276,7 +276,7 @@ public class UHFHelper {
                     }
                     Log.i("data", "c" + res.getEPC() + "|" + strResult);
                     Message msg = handler.obtainMessage();
-                    msg.obj = strResult + "EPC:" + res.getEPC() + "@" + res.getRssi();
+                    msg.obj = strResult + res.getEPC() + "@" + res.getRssi();
 
                     handler.sendMessage(msg);
                 }

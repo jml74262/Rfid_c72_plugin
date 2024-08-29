@@ -137,6 +137,27 @@ class _RfidScannerState extends State<RfidScanner> {
     }
   }
 
+  Future<void> _sendUniqueEPCsForDestiny() async {
+    final apiService = ApiService();
+    final epcList = _uniqueEPCs.toList();
+
+    try {
+      final fileBytes =
+          await apiService.sendEPCsAndGenerateExcelDestinyInventory(epcList);
+      final String timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .replaceAll('.', '-');
+      final String fileName =
+          'rfid_data_$timestamp.xlsx'; // Create a file name with the timestamp
+      await downloadExcelFile(fileBytes);
+      Get.snackbar('Success', 'File downloaded successfully',
+          backgroundColor: Colors.green, colorText: Colors.white);
+    } catch (e) {
+      _showError('Error sending data to API: $e');
+    }
+  }
+
   // Function to download the file
   // Function to download the file
   Future<void> downloadExcelFile(Uint8List bytes) async {
@@ -352,6 +373,7 @@ class _RfidScannerState extends State<RfidScanner> {
                   _buildClearButton(),
                   _build2DBarcodeButton(),
                   _buildDownloadExcelButton(),
+                  _builDownloadDestinyInventory(),
                   _buildTotalEPCDisplay(),
                   _buildTagList(),
                 ],
@@ -445,7 +467,7 @@ class _RfidScannerState extends State<RfidScanner> {
               ),
             ),
             child: const Text(
-              'Start Single Reading',
+              'Lectura Individual',
               style: TextStyle(color: Colors.white),
             ),
             onPressed:
@@ -460,8 +482,8 @@ class _RfidScannerState extends State<RfidScanner> {
             ),
             child: Text(
               _isContinuousCall
-                  ? 'Stop Continuous Reading'
-                  : 'Start Continuous Reading',
+                  ? 'Parar Lecura Continua'
+                  : 'Iniciar Lectura Continua',
               style: const TextStyle(color: Colors.white),
             ),
             onPressed: _toggleContinuousScan,
@@ -480,7 +502,7 @@ class _RfidScannerState extends State<RfidScanner> {
         ),
       ),
       child: const Text(
-        'Clear Data',
+        'Limpiar Información',
         style: TextStyle(color: Colors.white),
       ),
       onPressed: _clearData,
@@ -499,7 +521,9 @@ class _RfidScannerState extends State<RfidScanner> {
             ),
           ),
           child: Text(
-            _is2dscanCall ? 'Stop 2D Barcode scan' : 'Start 2D Barcode scan',
+            _is2dscanCall
+                ? 'Parar Lectura de Barras'
+                : 'Iniciar Lectura de Barras',
             style: const TextStyle(color: Colors.white),
           ),
           onPressed: _toggle2DBarcodeScan,
@@ -534,31 +558,75 @@ class _RfidScannerState extends State<RfidScanner> {
         ),
       ),
       child: const Text(
-        'Generate & Download Excel',
+        'Generar Excel',
         style: TextStyle(color: Colors.white),
       ),
       onPressed: _sendUniqueEPCsToAPI,
     );
   }
 
+  Widget _builDownloadDestinyInventory() {
+    return ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.orange,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(29.0),
+          ),
+        ),
+        onPressed: _sendUniqueEPCsForDestiny,
+        child: const Text('Descargar Inventario Destiny'));
+  }
+
   Widget _buildTagList() {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _data.length,
-      itemBuilder: (context, index) {
-        TagEpc tag = _data[index];
-        return GestureDetector(
-          onTap: () => _fetchLabelAndShowModal(tag.epc), // Trigger modal on tap
-          child: Card(
-            child: ListTile(
-              title: Text('EPC: ${tag.epc}'),
-              subtitle: Text('Count: ${tag.count}, RSSI: ${tag.rssi}'),
-              trailing: const Icon(Icons.info_outline),
+    return SingleChildScrollView(
+      scrollDirection:
+          Axis.horizontal, // Enables horizontal scrolling if needed
+      child: DataTable(
+        columns: const <DataColumn>[
+          DataColumn(
+            label: Text(
+              'EPC',
+              style: TextStyle(fontStyle: FontStyle.italic),
             ),
           ),
-        );
-      },
+          DataColumn(
+            label: Text(
+              'Count',
+              style: TextStyle(fontStyle: FontStyle.italic),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'RSSI',
+              style: TextStyle(fontStyle: FontStyle.italic),
+            ),
+          ),
+        ],
+        rows: _data.map((TagEpc tag) {
+          return DataRow(
+            cells: <DataCell>[
+              DataCell(
+                Text(tag.epc),
+                onTap: () {
+                  _fetchLabelAndShowModal(tag.epc); // Trigger modal on tap
+                },
+              ),
+              DataCell(
+                Text(tag.count),
+                onTap: () {
+                  _fetchLabelAndShowModal(tag.epc); // Trigger modal on tap
+                },
+              ),
+              DataCell(
+                Text(tag.rssi),
+                onTap: () {
+                  _fetchLabelAndShowModal(tag.epc); // Trigger modal on tap
+                },
+              ),
+            ],
+          );
+        }).toList(),
+      ),
     );
   }
 }

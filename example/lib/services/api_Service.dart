@@ -23,7 +23,7 @@ class ApiService {
 
   // Method to send EPCs and generate/download Excel file
   Future<Uint8List> sendEPCsAndGenerateExcel(List<String> epcs) async {
-    final apiUrl =
+    const apiUrl =
         '$baseUrl/RfidLabel/generate-excel-from-handheld'; // Replace with your API endpoint
 
     final response = await http.post(
@@ -32,8 +32,24 @@ class ApiService {
       body: jsonEncode(epcs), // Ensure the list is correctly serialized
     );
 
-    print(apiUrl);
-    print("response.statusCode: ${response.statusCode}");
+    if (response.statusCode == 200) {
+      return response.bodyBytes; // Return the file bytes
+    } else {
+      throw Exception('Failed to generate Excel file: ${response.body}');
+    }
+  }
+
+  // Mehod to send EPCs and generate/download Excel file for DESTINY INVENTORY
+  Future<Uint8List> sendEPCsAndGenerateExcelDestinyInventory(
+      List<String> epcs) async {
+    const apiUrl =
+        '$baseUrl/LabelDestiny/generate-excel-from-handheld'; // Replace with your API endpoint
+
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(epcs), // Ensure the list is correctly serialized
+    );
 
     if (response.statusCode == 200) {
       return response.bodyBytes; // Return the file bytes
