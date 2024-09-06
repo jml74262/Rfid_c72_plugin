@@ -10,7 +10,7 @@ class ProdEtiquetasRFID {
   double pesoTarima;
   double pesoBruto;
   double pesoNeto;
-  int piezas;
+  double piezas;
   String trazabilidad;
   String orden;
   String rfid;
@@ -52,7 +52,7 @@ class ProdEtiquetasRFID {
       pesoTarima: (json['pesoTarima'] as num).toDouble(),
       pesoBruto: (json['pesoBruto'] as num).toDouble(),
       pesoNeto: (json['pesoNeto'] as num).toDouble(),
-      piezas: json['piezas'],
+      piezas: (json['piezas'] as num).toDouble(),
       trazabilidad: json['trazabilidad'],
       orden: json['orden'],
       rfid: json['rfid'],

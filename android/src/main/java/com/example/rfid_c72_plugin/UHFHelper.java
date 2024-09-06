@@ -146,6 +146,8 @@ public class UHFHelper {
                 if (strUII != null) {
                     String strEPC = strUII.getEPC();
                     addEPCToList(strEPC, strUII.getRssi());
+                    // play success sound
+                    // BarcodeUtility.getInstance().enablePlaySuccessSound(context, true);
                     return true;
                 } else {
                     return false;
@@ -238,6 +240,7 @@ public class UHFHelper {
 
             }
             uhfListener.onRead(jsonArray.toString());
+            // BarcodeUtility.getInstance().enablePlaySuccessSound(context, true);
 
         }
     }

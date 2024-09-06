@@ -58,6 +58,22 @@ class ApiService {
     }
   }
 
+  Future<Uint8List> generateSAPFile(List<String> epcs) async {
+    const apiUrl = '$baseUrl/SAP'; // Replace with your API endpoint
+
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(epcs), // Ensure the list is correctly serialized
+    );
+
+    if (response.statusCode == 200) {
+      return response.bodyBytes; // Return the file bytes
+    } else {
+      throw Exception('Failed to generate Excel file: ${response.body}');
+    }
+  }
+
   // Future<void> sendEPCsAndGenerateExcel2(List<String> epcs) async {
   //   final url = Uri.parse('$baseUrl/RfidLabel/generate-excel');
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rfid_c72_plugin_example/entrada_sap_screen.dart';
 import 'package:rfid_c72_plugin_example/rfid_scanner.dart';
 import 'package:get/get.dart';
 
@@ -16,9 +17,13 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
-    return const GetMaterialApp(
+    return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       home: RfidScanner(),
+      getPages: [
+        GetPage(name: '/', page: () => RfidScanner()),
+        GetPage(name: '/entrada_sap', page: () => EntradaSapScreen()),
+      ],
     );
   }
 }
