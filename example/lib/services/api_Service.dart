@@ -58,6 +58,44 @@ class ApiService {
     }
   }
 
+  Future<Uint8List> sendEPCsAndGenerateExcelQualityInventory(
+      List<String> epcs) async {
+    print('sendEPCsAndGenerateExcelQualityInventory');
+    const apiUrl =
+        '$baseUrl/LabelQuality/generate-excel-from-handheld'; // Replace with your API endpoint
+
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(epcs), // Ensure the list is correctly serialized
+    );
+
+    if (response.statusCode == 200) {
+      return response.bodyBytes; // Return the file bytes
+    } else {
+      throw Exception('Failed to generate Excel file: ${response.body}');
+    }
+  }
+
+  Future<Uint8List> sendEPCsAndGenerateExcelVasoInventory(
+      List<String> epcs) async {
+    print('sendEPCsAndGenerateExcelVasoInventory');
+    const apiUrl =
+        '$baseUrl/LabelVaso/generate-excel-from-handheld'; // Replace with your API endpoint
+
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(epcs), // Ensure the list is correctly serialized
+    );
+
+    if (response.statusCode == 200) {
+      return response.bodyBytes; // Return the file bytes
+    } else {
+      throw Exception('Failed to generate Excel file: ${response.body}');
+    }
+  }
+
   Future<Uint8List> generateSAPFile(List<String> epcs) async {
     const apiUrl = '$baseUrl/SAP'; // Replace with your API endpoint
 

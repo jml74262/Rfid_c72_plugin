@@ -5,15 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:rfid_c72_plugin/rfid_c72_plugin.dart';
 import 'package:rfid_c72_plugin/tag_epc.dart';
 import 'package:get/get.dart';
 import 'package:rfid_c72_plugin_example/models/prodEtiquetasRFID.dart'; // Make sure to update this with the correct absolute path
 import 'package:rfid_c72_plugin_example/services/api_service.dart'; // Make sure to update this with the correct absolute path
 import 'package:audioplayers/audioplayers.dart';
-import 'dart:isolate';
-import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:open_file/open_file.dart';
 
 class RfidScanner extends StatefulWidget {
@@ -37,9 +34,6 @@ class _RfidScannerState extends State<RfidScanner> {
   final TextEditingController _powerLevelController = TextEditingController();
   final List<TagEpc> _data = [];
   final List<String> _EPC = [];
-  Duration _debounceDuration =
-      const Duration(milliseconds: 500); // Adjust debounce duration as needed
-  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -91,8 +85,6 @@ class _RfidScannerState extends State<RfidScanner> {
   }
 
   void _handleKeyEvent(RawKeyEvent event) {
-    print('Pressed key code: ${event.logicalKey.keyId}');
-
     if (event is RawKeyDownEvent) {
       const int dedicatedButtonKeyCode = 73014444325;
 
@@ -156,17 +148,50 @@ class _RfidScannerState extends State<RfidScanner> {
     }
   }
 
-  // Function to download the file
+  Future<void> _sendUniqueEPCsForQuality() async {
+    final apiService = ApiService();
+    final epcList = _uniqueEPCs.toList();
+
+    try {
+      final fileBytes =
+          await apiService.sendEPCsAndGenerateExcelQualityInventory(epcList);
+      final String timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .replaceAll('.', '-');
+      final String fileName =
+          'rfid_data_$timestamp.xlsx'; // Create a file name with the timestamp
+      await downloadExcelFile(fileBytes);
+      Get.snackbar('Success', 'File downloaded successfully',
+          backgroundColor: Colors.green, colorText: Colors.white);
+    } catch (e) {
+      _showError('Error sending data to API: $e');
+    }
+  }
+
+  Future<void> _sendUniqueEPCSForVaso() async {
+    final apiService = ApiService();
+    final epcList = _uniqueEPCs.toList();
+
+    try {
+      final fileBytes =
+          await apiService.sendEPCsAndGenerateExcelVasoInventory(epcList);
+      final String timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .replaceAll('.', '-');
+      final String fileName =
+          'rfid_data_$timestamp.xlsx'; // Create a file name with the timestamp
+      await downloadExcelFile(fileBytes);
+      Get.snackbar('Success', 'File downloaded successfully',
+          backgroundColor: Colors.green, colorText: Colors.white);
+    } catch (e) {
+      _showError('Error sending data to API: $e');
+    }
+  }
+
   // Function to download the file
   Future<void> downloadExcelFile(Uint8List bytes) async {
-    // bool permissionGranted = await requestStoragePermission();
-    // if (!permissionGranted) {
-    //   // Handle the case when permission is not granted
-    //   print('Storage permission denied');
-    //   Get.snackbar("Permission Denied",
-    //       "Storage permission is required to save the file.");
-    //   return;
-    // }
     final String timestamp = DateTime.now()
         .toIso8601String()
         .replaceAll(':', '-')
@@ -206,12 +231,6 @@ class _RfidScannerState extends State<RfidScanner> {
     } catch (e) {
       // print('Error playing beep sound: $e');
     }
-  }
-
-  // Separate function to parse tags
-  void _parseTagsInBackground(SendPort sendPort, dynamic result) {
-    List<TagEpc> newTags = TagEpc.parseTags(result);
-    sendPort.send(newTags);
   }
 
   void _updateTags(dynamic result) {
@@ -304,32 +323,32 @@ class _RfidScannerState extends State<RfidScanner> {
     });
   }
 
-  Future<void> _toggle2DBarcodeScan() async {
-    setState(() {
-      _is2dscanCall = !_is2dscanCall;
-    });
+  // Future<void> _toggle2DBarcodeScan() async {
+  //   setState(() {
+  //     _is2dscanCall = !_is2dscanCall;
+  //   });
 
-    if (_is2dscanCall) {
-      await RfidC72Plugin.scanBarcode;
-      String? scannedCode = await RfidC72Plugin.readBarcode;
-      if (scannedCode != null && scannedCode.isNotEmpty) {
-        setState(() {
-          _data.add(TagEpc(
-            epc: scannedCode,
-            id: '',
-            count: '',
-            rssi: '',
-          ));
-          _totalEPC = _data.toSet().length;
+  //   if (_is2dscanCall) {
+  //     await RfidC72Plugin.scanBarcode;
+  //     String? scannedCode = await RfidC72Plugin.readBarcode;
+  //     if (scannedCode != null && scannedCode.isNotEmpty) {
+  //       setState(() {
+  //         _data.add(TagEpc(
+  //           epc: scannedCode,
+  //           id: '',
+  //           count: '',
+  //           rssi: '',
+  //         ));
+  //         _totalEPC = _data.toSet().length;
 
-          // Fetch the label info for the scanned barcode and show it in a modal
-          _fetchLabelAndShowModal(scannedCode);
-        });
-      }
-    } else {
-      await RfidC72Plugin.stopScan;
-    }
-  }
+  //         // Fetch the label info for the scanned barcode and show it in a modal
+  //         _fetchLabelAndShowModal(scannedCode);
+  //       });
+  //     }
+  //   } else {
+  //     await RfidC72Plugin.stopScan;
+  //   }
+  // }
 
   void _showError(String message) {
     Get.snackbar(
@@ -377,13 +396,13 @@ class _RfidScannerState extends State<RfidScanner> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: <Widget>[
-          DrawerHeader(
-            child: const Text(
+          const DrawerHeader(
+            decoration: BoxDecoration(
+              color: Colors.blue,
+            ),
+            child: Text(
               'Opciones',
               style: TextStyle(color: Colors.white, fontSize: 25),
-            ),
-            decoration: const BoxDecoration(
-              color: Colors.blue,
             ),
           ),
           ListTile(
@@ -407,18 +426,6 @@ class _RfidScannerState extends State<RfidScanner> {
     );
   }
 
-  Widget _buildHeaderIcon() {
-    return const Card(
-      child: Padding(
-        padding: EdgeInsets.all(3.0),
-        child: Icon(
-          Icons.barcode_reader,
-          size: 100,
-        ),
-      ),
-    );
-  }
-
   bool _validatePowerLevel(String value) {
     final int? powerLevel = int.tryParse(value);
     return powerLevel != null && powerLevel >= 1 && powerLevel <= 30;
@@ -437,12 +444,11 @@ class _RfidScannerState extends State<RfidScanner> {
                 borderRadius: BorderRadius.circular(5.0),
               ),
             ),
+            onPressed: _startSingleReading,
             child: const Text(
               'Lectura Individual',
               style: TextStyle(color: Colors.white),
-            ),
-            onPressed:
-                _startSingleReading, // Trigger single reading and play beep
+            ), // Trigger single reading and play beep
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -451,11 +457,11 @@ class _RfidScannerState extends State<RfidScanner> {
                 borderRadius: BorderRadius.circular(5.0),
               ),
             ),
+            onPressed: _toggleContinuousScan,
             child: Text(
               _isContinuousCall ? 'Parar Lectura Continua' : 'Lectura Continua',
               style: const TextStyle(color: Colors.white),
             ),
-            onPressed: _toggleContinuousScan,
           ),
         ],
       ),
@@ -465,7 +471,7 @@ class _RfidScannerState extends State<RfidScanner> {
   Widget _buildClearButton() {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: Colors.redAccent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(5.0),
         ),
@@ -508,70 +514,130 @@ class _RfidScannerState extends State<RfidScanner> {
     );
   }
 
-  Widget _build2DBarcodeButton() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: <Widget>[
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _is2dscanCall ? Colors.red : Colors.green,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(5.0),
-            ),
-          ),
-          child: Text(
-            _is2dscanCall
-                ? 'Parar Lectura de Barras'
-                : 'Iniciar Lectura de Barras',
-            style: const TextStyle(color: Colors.white),
-          ),
-          onPressed: _toggle2DBarcodeScan,
-        ),
-      ],
-    );
-  }
+  // Widget _build2DBarcodeButton() {
+  //   return Row(
+  //     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  //     children: <Widget>[
+  //       ElevatedButton(
+  //         style: ElevatedButton.styleFrom(
+  //           backgroundColor: _is2dscanCall ? Colors.red : Colors.green,
+  //           shape: RoundedRectangleBorder(
+  //             borderRadius: BorderRadius.circular(5.0),
+  //           ),
+  //         ),
+  //         onPressed: _toggle2DBarcodeScan,
+  //         child: Text(
+  //           _is2dscanCall
+  //               ? 'Parar Lectura de Barras'
+  //               : 'Iniciar Lectura de Barras',
+  //           style: const TextStyle(color: Colors.white),
+  //         ),
+  //       ),
+  //     ],
+  //   );
+  // }
 
   Widget _buildExcelButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Space between buttons
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(5.0),
-            ),
-          ),
-          onPressed: _sendUniqueEPCsToAPI,
-          child: Row(
-            children: [
-              Icon(Icons.insert_drive_file, color: Colors.white), // Excel icon
-              SizedBox(width: 8), // Space between icon and text
-              Text(
-                'Excel General',
-                style: TextStyle(color: Colors.white),
+        Row(
+          mainAxisAlignment:
+              MainAxisAlignment.spaceEvenly, // Space between buttons
+          children: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5.0),
+                ),
               ),
-            ],
-          ),
+              onPressed: _sendUniqueEPCsToAPI,
+              child: const Row(
+                children: [
+                  Icon(Icons.insert_drive_file,
+                      color: Colors.white), // Excel icon
+                  SizedBox(width: 8), // Space between icon and text
+                  Text(
+                    'Excel General',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5.0),
+                ),
+              ),
+              onPressed: _sendUniqueEPCsForDestiny,
+              child: const Row(
+                children: [
+                  Icon(Icons.insert_drive_file,
+                      color: Colors.white), // Excel icon
+                  SizedBox(width: 8), // Space between icon and text
+                  Text(
+                    'Excel Destiny',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(5.0),
-            ),
-          ),
-          onPressed: _sendUniqueEPCsForDestiny,
-          child: Row(
-            children: [
-              Icon(Icons.insert_drive_file, color: Colors.white), // Excel icon
-              SizedBox(width: 8), // Space between icon and text
-              Text(
-                'Excel Destiny',
-                style: TextStyle(color: Colors.white),
+        const SizedBox(height: 10), // Add spacing between the rows
+        Row(
+          mainAxisAlignment:
+              MainAxisAlignment.spaceEvenly, // Space between buttons
+          children: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5.0),
+                ),
               ),
-            ],
-          ),
+              onPressed:
+                  // Add action for the third button
+                  _sendUniqueEPCsForQuality,
+              child: const Row(
+                children: [
+                  Icon(Icons.file_download,
+                      color: Colors.white), // Another icon
+                  SizedBox(width: 8),
+                  Text(
+                    'Excel Quality',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5.0),
+                ),
+              ),
+              onPressed: () {
+                // Add action for the fourth button
+                _sendUniqueEPCSForVaso;
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.file_download,
+                      color: Colors.white), // Another icon
+                  SizedBox(width: 8),
+                  Text(
+                    'Excel Vaso    ',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -596,7 +662,7 @@ class _RfidScannerState extends State<RfidScanner> {
                 color: Colors.grey.withOpacity(0.2), // Shadow color
                 spreadRadius: 2, // How wide the shadow spreads
                 blurRadius: 5, // How much the shadow blurs
-                offset: Offset(0, 2), // Offset for shadow position
+                offset: const Offset(0, 2), // Offset for shadow position
               ),
             ],
           ),
@@ -604,7 +670,7 @@ class _RfidScannerState extends State<RfidScanner> {
             controller: _powerLevelController,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 16, // Increase font size
               color: Colors.black87, // Text color
             ),
@@ -637,19 +703,19 @@ class _RfidScannerState extends State<RfidScanner> {
               if (result != null && result) {
                 Get.snackbar(
                     "Potencia cambiada", "Potencia cambiada a $value dBm",
-                    backgroundColor: Color.fromARGB(255, 150, 206, 153));
+                    backgroundColor: const Color.fromARGB(255, 150, 206, 153));
               } else {
                 Get.snackbar(
                   "Error",
                   "Ocurrió un error inesperado al cambiar la potencia",
-                  backgroundColor: Color.fromARGB(255, 206, 150, 150),
+                  backgroundColor: const Color.fromARGB(255, 206, 150, 150),
                 );
               }
             } else {
               Get.snackbar(
                 "Error",
                 "Por favor ingresa un valor entre 5 y 30",
-                backgroundColor: Color.fromARGB(255, 221, 211, 118),
+                backgroundColor: const Color.fromARGB(255, 221, 211, 118),
               );
             }
           },
@@ -676,7 +742,7 @@ class _RfidScannerState extends State<RfidScanner> {
   }
 
   Widget _buildTagList() {
-    return Container(
+    return SizedBox(
       height: MediaQuery.of(context).size.height * 0.5, // 50% of screen height
       child: ListView.builder(
         itemCount: _data.length,
@@ -685,7 +751,7 @@ class _RfidScannerState extends State<RfidScanner> {
           return ListTile(
             title: Text(tag.epc),
             trailing: IconButton(
-              icon: Icon(Icons.delete, color: Colors.red), // Delete icon
+              icon: const Icon(Icons.delete, color: Colors.red), // Delete icon
               onPressed: () {
                 _deleteTag(index); // Call the delete function
               },

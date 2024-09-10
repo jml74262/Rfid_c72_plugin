@@ -50,9 +50,9 @@ class _EntradaSapScreenState extends State<EntradaSapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Entradas SAP'),
+        title: const Text('Entradas SAP'),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () {
             _closeAllConnections();
             Get.toNamed(
@@ -185,12 +185,11 @@ class _EntradaSapScreenState extends State<EntradaSapScreen> {
                 borderRadius: BorderRadius.circular(5.0),
               ),
             ),
+            onPressed: _startSingleReading,
             child: const Text(
               'Lectura Individual',
               style: TextStyle(color: Colors.white),
-            ),
-            onPressed:
-                _startSingleReading, // Trigger single reading and play beep
+            ), // Trigger single reading and play beep
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -199,11 +198,11 @@ class _EntradaSapScreenState extends State<EntradaSapScreen> {
                 borderRadius: BorderRadius.circular(5.0),
               ),
             ),
+            onPressed: _toggleContinuousScan,
             child: Text(
               _isContinuousCall ? 'Parar Lectura Continua' : 'Lectura Continua',
               style: const TextStyle(color: Colors.white),
             ),
-            onPressed: _toggleContinuousScan,
           ),
         ],
       ),
@@ -283,7 +282,7 @@ class _EntradaSapScreenState extends State<EntradaSapScreen> {
             controller: _powerLevelController,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 16, // Increase font size
               color: Colors.black87, // Text color
             ),
@@ -316,19 +315,19 @@ class _EntradaSapScreenState extends State<EntradaSapScreen> {
               if (result != null && result) {
                 Get.snackbar(
                     "Potencia cambiada", "Potencia cambiada a $value dBm",
-                    backgroundColor: Color.fromARGB(255, 150, 206, 153));
+                    backgroundColor: const Color.fromARGB(255, 150, 206, 153));
               } else {
                 Get.snackbar(
                   "Error",
                   "Ocurrió un error inesperado al cambiar la potencia",
-                  backgroundColor: Color.fromARGB(255, 206, 150, 150),
+                  backgroundColor: const Color.fromARGB(255, 206, 150, 150),
                 );
               }
             } else {
               Get.snackbar(
                 "Error",
                 "Por favor ingresa un valor entre 5 y 30",
-                backgroundColor: Color.fromARGB(255, 221, 211, 118),
+                backgroundColor: const Color.fromARGB(255, 221, 211, 118),
               );
             }
           },
@@ -360,7 +359,7 @@ class _EntradaSapScreenState extends State<EntradaSapScreen> {
   }
 
   Widget _buildTagList() {
-    return Container(
+    return SizedBox(
       height: MediaQuery.of(context).size.height * 0.5, // 50% of screen height
       child: ListView.builder(
         itemCount: _data.length,
@@ -369,7 +368,7 @@ class _EntradaSapScreenState extends State<EntradaSapScreen> {
           return ListTile(
             title: Text(tag.epc),
             trailing: IconButton(
-              icon: Icon(Icons.delete, color: Colors.red), // Delete icon
+              icon: const Icon(Icons.delete, color: Colors.red), // Delete icon
               onPressed: () {
                 _deleteTag(index); // Call the delete function
               },
@@ -459,7 +458,7 @@ class _EntradaSapScreenState extends State<EntradaSapScreen> {
   Widget _buildSapButton() {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        primary: Colors.blueAccent,
+        backgroundColor: Colors.blueAccent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(5.0),
         ),
@@ -529,8 +528,6 @@ class _EntradaSapScreenState extends State<EntradaSapScreen> {
   }
 
   void _handleKeyEvent(RawKeyEvent event) {
-    print('Pressed key code: ${event.logicalKey.keyId}');
-
     if (event is RawKeyDownEvent) {
       const int dedicatedButtonKeyCode = 73014444325;
 
