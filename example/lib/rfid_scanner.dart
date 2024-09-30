@@ -366,6 +366,21 @@ class _RfidScannerState extends State<RfidScanner> {
       key: scaffolkey,
       appBar: AppBar(
         title: const Text('Lector RFID'),
+        actions: [
+          // IconButton(
+          //   icon: const Icon(Icons.refresh),
+          //   onPressed: () {
+          //     _initializeRfidPlugin();
+          //   },
+          // ),
+          IconButton(
+            icon: const Icon(Icons.add_box_outlined),
+            // Increase the size of the icon
+            onPressed: () {
+              showInventoryModal(context); // Function to open modal
+            },
+          ),
+        ],
       ),
       drawer: _buildDrawer(),
       body: _isLoading
@@ -388,6 +403,136 @@ class _RfidScannerState extends State<RfidScanner> {
               ),
             ),
     );
+  }
+
+  void showInventoryModal(BuildContext context) {
+    TextEditingController fechaInventarioController = TextEditingController();
+    TextEditingController operadorController = TextEditingController();
+    TextEditingController ubicacionController = TextEditingController();
+    TextEditingController nombreArchivoController = TextEditingController();
+
+    String? selectedFormatoEtiqueta;
+    List<String> formatoEtiquetaOptions = [
+      'BIOFLEX',
+      'Other1',
+      'Other2',
+      'Other3'
+    ];
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Registro Inventario'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                TextField(
+                  controller: fechaInventarioController,
+                  decoration: const InputDecoration(
+                    labelText: 'Fecha Inventario',
+                    hintText: 'YYYY-MM-DD',
+                  ),
+                  readOnly: true, // Prevents the keyboard from opening
+                  onTap: () async {
+                    DateTime? selectedDate = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (selectedDate != null) {
+                      fechaInventarioController.text = selectedDate
+                          .toString()
+                          .split(' ')[0]; // Default format
+                    }
+                  },
+                ),
+                DropdownButtonFormField<String>(
+                  value: selectedFormatoEtiqueta,
+                  decoration: const InputDecoration(
+                    labelText: 'Formato Etiqueta',
+                  ),
+                  items: formatoEtiquetaOptions.map((String option) {
+                    return DropdownMenuItem<String>(
+                      value: option,
+                      child: Text(option),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    selectedFormatoEtiqueta =
+                        newValue; // Update the selected value
+                  },
+                ),
+                TextField(
+                  controller: operadorController,
+                  decoration: const InputDecoration(
+                    labelText: 'Operador',
+                  ),
+                ),
+                TextField(
+                  controller: ubicacionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Ubicación',
+                  ),
+                ),
+                TextField(
+                  controller: nombreArchivoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del Archivo',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancelar'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Guardar'),
+              onPressed: () {
+                // Ensure date is selected before parsing
+                if (fechaInventarioController.text.isNotEmpty) {
+                  DateTime fechaInventario =
+                      DateTime.parse(fechaInventarioController.text);
+                  String formatoEtiqueta = selectedFormatoEtiqueta ??
+                      'BIOFLEX'; // Use selected option or default
+                  String operador = operadorController.text;
+                  String ubicacion = ubicacionController.text;
+                  String nombreArchivo = nombreArchivoController.text;
+
+                  // Call the API to save the inventory
+                  _saveInventory(fechaInventario, formatoEtiqueta, operador,
+                      ubicacion, nombreArchivo);
+
+                  Navigator.of(context).pop(); // Close the modal
+                } else {
+                  // Handle the case where no date is selected
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _saveInventory(DateTime fechaInventario, String formatoEtiqueta,
+      String operador, String ubicacion, String nombreArchivo) async {
+    final apiService = ApiService();
+    final epcList = _uniqueEPCs.toList();
+    try {
+      final fileBytes = await apiService.saveInventoryRecord(epcList,
+          fechaInventario, formatoEtiqueta, operador, ubicacion, nombreArchivo);
+      Get.snackbar('Success', 'Registro guardado correctamente',
+          backgroundColor: Colors.green, colorText: Colors.white);
+    } catch (e) {
+      _showError('Error sending data to API: $e');
+    }
   }
 
   // Create a drawer with a list of items to display
@@ -415,10 +560,11 @@ class _RfidScannerState extends State<RfidScanner> {
           ),
           ListTile(
             leading: const Icon(Icons.info),
-            title: const Text('Acerca de'),
+            title: const Text('Conexión Bluetooth'),
             onTap: () {
               // Navigate to the about screen
               // Navigator.pushNamed(context, '/about');
+              Get.toNamed('/bluetooth');
             },
           ),
         ],
@@ -621,10 +767,9 @@ class _RfidScannerState extends State<RfidScanner> {
                   borderRadius: BorderRadius.circular(5.0),
                 ),
               ),
-              onPressed: () {
-                // Add action for the fourth button
-                _sendUniqueEPCSForVaso;
-              },
+              onPressed:
+                  // Add action for the fourth button
+                  _sendUniqueEPCSForVaso,
               child: const Row(
                 children: [
                   Icon(Icons.file_download,

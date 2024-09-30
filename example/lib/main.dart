@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:rfid_c72_plugin_example/bluetooth_screen.dart';
+import 'package:rfid_c72_plugin_example/device_screen.dart';
 import 'package:rfid_c72_plugin_example/entrada_sap_screen.dart';
 import 'package:rfid_c72_plugin_example/rfid_scanner.dart';
 import 'package:get/get.dart';
@@ -23,6 +25,8 @@ class _MyAppState extends State<MyApp> {
       getPages: [
         GetPage(name: '/', page: () => RfidScanner()),
         GetPage(name: '/entrada_sap', page: () => EntradaSapScreen()),
+        GetPage(name: '/bluetooth', page: () => DiscoveryPage()),
+        GetPage(name: '/device', page: () => DeviceScreen()),
       ],
     );
   }

@@ -81,7 +81,7 @@ class ApiService {
       List<String> epcs) async {
     print('sendEPCsAndGenerateExcelVasoInventory');
     const apiUrl =
-        '$baseUrl/LabelVaso/generate-excel-from-handheld'; // Replace with your API endpoint
+        '$baseUrl/Vaso/generate-excel-from-handheld'; // Replace with your API endpoint
 
     final response = await http.post(
       Uri.parse(apiUrl),
@@ -93,6 +93,35 @@ class ApiService {
       return response.bodyBytes; // Return the file bytes
     } else {
       throw Exception('Failed to generate Excel file: ${response.body}');
+    }
+  }
+
+  // Method to save inventory record
+  Future<void> saveInventoryRecord(
+      List<String> epcs,
+      DateTime fechaInventario,
+      String formatoEtiqueta,
+      String operador,
+      String ubicacion,
+      String nombreArchivo) async {
+    const apiUrl =
+        '$baseUrl/RfidLabel/generate-excel-from-handheld-save-inventory'; // Replace with your API endpoint
+
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'epcs': epcs,
+        'fechaInventario': fechaInventario.toIso8601String(),
+        'formatoEtiqueta': formatoEtiqueta,
+        'operador': operador,
+        'ubicacion': ubicacion,
+        'nombreArchivo': nombreArchivo
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to save inventory record: ${response.body}');
     }
   }
 
